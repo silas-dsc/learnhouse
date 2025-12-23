@@ -146,6 +146,7 @@ def ai_start_activity_chat_session(
         ai_friendly_text,
         message,
         ai_model,
+        use_grammar=chat_session_object.use_grammar,
     )
 
     # Save the message exchange to history
@@ -274,6 +275,7 @@ def ai_send_activity_chat_message(
         ai_friendly_text,
         message,
         ai_model,
+        use_grammar=chat_session_object.use_grammar,
     )
 
     # Save the message exchange to history

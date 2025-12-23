@@ -4,11 +4,13 @@ import { RequestBodyWithAuthHeader } from '@services/utils/ts/requests'
 export async function startActivityAIChatSession(
   message: string,
   access_token: string,
-  activity_uuid?: string
+  activity_uuid?: string,
+  use_grammar?: boolean
 ) {
   const data = {
     message,
     activity_uuid,
+    use_grammar,
   }
   const result = await fetch(
     `${getAPIUrl()}ai/start/activity_chat_session`,
@@ -36,12 +38,14 @@ export async function sendActivityAIChatMessage(
   message: string,
   aichat_uuid: string,
   activity_uuid: string,
-  access_token: string
+  access_token: string,
+  use_grammar?: boolean
 ) {
   const data = {
     aichat_uuid,
     message,
     activity_uuid,
+    use_grammar,
   }
   const result = await fetch(
     `${getAPIUrl()}ai/send/activity_chat_message`,

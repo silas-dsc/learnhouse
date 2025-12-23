@@ -2,6 +2,8 @@ from typing import Optional, Dict, Any
 from uuid import uuid4
 import redis
 import json
+import os
+import requests
 from openai import OpenAI
 
 from config.config import get_learnhouse_config
@@ -27,11 +29,16 @@ def ask_ai(
     text_reference: str,
     message_for_the_prompt: str,
     openai_model_name: str,  # Default to 'gpt-oss:120b-cloud'
+    use_grammar: bool = False,
 ) -> Dict[str, Any]:
     """
     Process an AI query using OpenAI SDK directly with course content as context
     """
     try:
+        # If grammar-constrained generation is requested, use the completion endpoint
+        if use_grammar:
+            return ask_ai_with_grammar(question, text_reference, message_for_the_prompt)
+        
         client = get_openai_client()
         
         # Build conversation history
@@ -73,7 +80,8 @@ def ask_ai(
             model=openai_model_name,
             messages=messages,
             temperature=0.7,
-            max_tokens=1000
+            max_tokens=1000,
+            response_format={"type": "json_object"} if openai_model_name.startswith("gpt") else None
         )
         
         # Log the complete response for debugging
@@ -86,6 +94,50 @@ def ask_ai(
         
     except Exception as e:
         raise Exception(f"Error processing AI request: {str(e)}")
+
+def ask_ai_with_grammar(
+    question: str,
+    text_reference: str,
+    message_for_the_prompt: str,
+) -> Dict[str, Any]:
+    """
+    Process an AI query using llama-server's completion endpoint with grammar constraints
+    """
+    try:
+        # Read the grammar file
+        grammar_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'quiz.gbnf')
+        with open(grammar_path, 'r') as f:
+            grammar = f.read()
+        
+        # Build the prompt
+        prompt = f"{message_for_the_prompt}\n\nCourse Content Context:\n{text_reference}\n\n{question}\n\nOutput ONLY in the required format:\n"
+        
+        # Call the completion endpoint with grammar
+        response = requests.post(
+            'http://localhost:8080/completion',
+            json={
+                'prompt': prompt,
+                'temperature': 0.2,
+                'top_p': 0.9,
+                'n_predict': 600,
+                'grammar': grammar,
+            },
+            headers={'Content-Type': 'application/json'}
+        )
+        
+        response.raise_for_status()
+        result = response.json()
+        
+        # Log the response for debugging
+        print("AI Grammar Response:", result)
+        
+        return {
+            "output": result.get('content', ''),
+            "intermediate_steps": []
+        }
+        
+    except Exception as e:
+        raise Exception(f"Error processing AI request with grammar: {str(e)}")
 
 def get_chat_session_history(aichat_uuid: Optional[str] = None) -> Dict[str, Any]:
     """Get or create a new chat session history using Redis"""

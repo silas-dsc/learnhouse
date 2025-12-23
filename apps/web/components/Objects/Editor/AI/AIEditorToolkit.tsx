@@ -99,10 +99,7 @@ function AIEditorToolkit(props: AIEditorToolkitProps) {
                             alt=""
                           />
                           <div className="flex items-center">
-                            AI Editor{' '}
-                            <span className="text-[10px] px-2 py-1 rounded-3xl ml-3 bg-white/10 uppercase">
-                              PRE-ALPHA
-                            </span>
+                            AI Editor
                           </div>
                           <MoreVertical className="text-white/50" size={12} />
                         </div>
@@ -111,7 +108,7 @@ function AIEditorToolkit(props: AIEditorToolkitProps) {
                         <AiEditorToolButton label="Writer" />
                         <AiEditorToolButton label="ContinueWriting" />
                         <AiEditorToolButton label="MakeLonger" />
-
+                        <AiEditorToolButton label="GenerateQuiz" />
                         <AiEditorToolButton label="Translate" />
                       </div>
                       <div className="flex space-x-2 items-center">
@@ -153,7 +150,7 @@ const UserFeedbackModal = (props: AIEditorToolkitProps) => {
     })
   }
 
-  const sendReqWithMessage = async (message: string) => {
+  const sendReqWithMessage = async (message: string, use_grammar: boolean = false) => {
     if (aiEditorState.aichat_uuid) {
       await dispatchAIEditor({
         type: 'addMessage',
@@ -163,7 +160,9 @@ const UserFeedbackModal = (props: AIEditorToolkitProps) => {
       const response = await sendActivityAIChatMessage(
         message,
         aiEditorState.aichat_uuid,
-        props.activity.activity_uuid, access_token
+        props.activity.activity_uuid,
+        access_token,
+        use_grammar
       )
       if (response.success === false) {
         await dispatchAIEditor({ type: 'setIsNoLongerWaitingForResponse' })
@@ -195,8 +194,10 @@ const UserFeedbackModal = (props: AIEditorToolkitProps) => {
       })
       await dispatchAIEditor({ type: 'setIsWaitingForResponse' })
       const response = await startActivityAIChatSession(
-        message, access_token,
-        props.activity.activity_uuid
+        message,
+        access_token,
+        props.activity.activity_uuid,
+        use_grammar
       )
       if (response.success === false) {
         await dispatchAIEditor({ type: 'setIsNoLongerWaitingForResponse' })
@@ -292,7 +293,15 @@ const UserFeedbackModal = (props: AIEditorToolkitProps) => {
         await dispatchAIEditor({ type: 'setIsNoLongerWaitingForResponse' })
       }
     } else if (label === 'GenerateQuiz') {
-      // will be implemented in future stages
+      let ai_message = ''
+      let text_selection = getTipTapEditorSelectedText()
+      let prompt = getPrompt({ label: label, selection: text_selection })
+      if (prompt) {
+        await dispatchAIEditor({ type: 'setIsWaitingForResponse' })
+        ai_message = await sendReqWithMessage(prompt, true) // Pass use_grammar: true
+        await insertQuizAfterSelection(ai_message)
+        await dispatchAIEditor({ type: 'setIsNoLongerWaitingForResponse' })
+      }
     } else if (label === 'Translate') {
       let ai_message = ''
       let text_selection = getTipTapEditorSelectedText()
@@ -463,6 +472,103 @@ const UserFeedbackModal = (props: AIEditorToolkitProps) => {
     props.editor.chain().focus().insertContent(nodes).run();
   }
 
+  async function insertQuizAfterSelection(aiResponse: string) {
+    try {
+      const questions = [];
+      let currentQuestion = null;
+      let currentAnswers = [];
+      
+      // Clean the response
+      const cleanedResponse = aiResponse
+        .replace(/```[\w]*\n?/g, '') // Remove code blocks
+        .replace(/\*\*/g, '') // Remove bold markers
+        .trim();
+      
+      const lines = cleanedResponse.split('\n').filter(line => line.trim());
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        
+        // Check if this is a question line (Q1:, Q2:, etc., or just a question mark at the end)
+        const questionMatch = line.match(/^Q\d+[:\s]+(.*)/i) || 
+                            (line.endsWith('?') && !line.match(/^[A-Z]\)/)) ? [null, line.replace(/^Q\d+[:\s]+/i, '')] : null;
+        
+        if (questionMatch) {
+          // Save previous question if exists
+          if (currentQuestion && currentAnswers.length > 0) {
+            questions.push({
+              question_id: `question_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              question: currentQuestion,
+              type: 'multiple_choice',
+              answers: currentAnswers,
+            });
+          }
+          
+          // Start new question
+          currentQuestion = questionMatch[1].trim();
+          currentAnswers = [];
+        }
+        // Check if this is an answer line (A), B), C), etc.)
+        else if (line.match(/^[A-Z]\)/)) {
+          const answerMatch = line.match(/^([A-Z])\)\s*(.+)$/);
+          if (answerMatch && currentQuestion) {
+            const answerText = answerMatch[2].trim();
+            const isCorrect = answerText.toLowerCase().includes('[correct]') || 
+                            answerText.toLowerCase().includes('(correct)') ||
+                            answerText.includes('✓') ||
+                            answerText.includes('✔');
+            const cleanAnswer = answerText
+              .replace(/\[CORRECT\]/gi, '')
+              .replace(/\(CORRECT\)/gi, '')
+              .replace(/[✓✔]/g, '')
+              .trim();
+            
+            currentAnswers.push({
+              answer_id: `answer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              answer: cleanAnswer,
+              correct: isCorrect,
+            });
+          }
+        }
+      }
+      
+      // Don't forget the last question
+      if (currentQuestion && currentAnswers.length > 0) {
+        questions.push({
+          question_id: `question_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          question: currentQuestion,
+          type: 'multiple_choice',
+          answers: currentAnswers,
+        });
+      }
+      
+      if (questions.length === 0) {
+        throw new Error('No questions parsed from response');
+      }
+      
+      // Move cursor to the end of selection
+      const { to } = props.editor.state.selection;
+      
+      // Insert the quiz block after the selection
+      props.editor
+        .chain()
+        .focus()
+        .setTextSelection(to)
+        .insertContent({
+          type: 'blockQuiz',
+          attrs: {
+            questions: questions,
+          },
+        })
+        .run();
+    } catch (error) {
+      console.error('Failed to parse quiz:', error);
+      console.error('AI Response:', aiResponse);
+      // Fallback: insert as text if parsing fails
+      await fillEditorWithText(aiResponse);
+    }
+  }
+
   const getPrompt = (args: AIPromptsLabels) => {
     const { label, selection } = args
     const promptCommon = "Include headings, paragraphs, lists, and callouts where appropriate. Vary the sentence lengths and write in a creative and compelling way, like a professional writer. Use Australian spelling. Strictly adhere to Markdown 1.0 format in your response."
@@ -474,19 +580,34 @@ const UserFeedbackModal = (props: AIEditorToolkitProps) => {
     } else if (label === 'MakeLonger') {
       return `Make longer this text longer : "${selection}". Add more details and explanations to enhance the content while maintaining the original meaning. Respond only with the enhanced text. ${promptCommon}`
     } else if (label === 'GenerateQuiz') {
-      return `Generate a quiz about "${selection}", only return an array of objects, every object should respect the following interface:
-            interface Answer {
-                answer_id: string;
-                answer: string;
-                correct: boolean;
-              }
-              interface Question {
-                question_id: string;
-                question: string;
-                type: "multiple_choice" 
-                answers: Answer[];
-              }
-            " `
+      return `Generate a multiple choice quiz about "${selection}". Create exactly 3 questions.
+
+IMPORTANT: Follow this EXACT format:
+
+Q1: [Write the first question here ending with a question mark?]
+A) [First answer option]
+B) [Second answer option] [CORRECT]
+C) [Third answer option]
+D) [Fourth answer option]
+
+Q2: [Write the second question here ending with a question mark?]
+A) [First answer option] [CORRECT]
+B) [Second answer option]
+C) [Third answer option]
+
+Q3: [Write the third question here ending with a question mark?]
+A) [First answer option]
+B) [Second answer option]
+C) [Third answer option] [CORRECT]
+D) [Fourth answer option]
+
+Rules:
+- Each question must start with Q and a number (Q1:, Q2:, Q3:)
+- Each answer must start with a letter and closing parenthesis (A), B), C), D))
+- Mark EXACTLY ONE correct answer per question with [CORRECT] after the answer text
+- Do NOT include any other text, explanations, or formatting
+- Do NOT use markdown formatting, bold text, or code blocks
+- Questions must end with a question mark`
     } else if (label === 'Translate') {
       return (
         `Translate "${selection}" to the ${aiEditorState.chatInputValue} language. Respond only with the translated text.`
@@ -693,6 +814,26 @@ const AiEditorActionScreen = ({
               className="flex cursor-pointer space-x-1.5 p-4 mt-4 items-center bg-white/10  rounded-md outline outline-1 outline-neutral-200/20 text-2xl font-semibold text-white/70 hover:bg-white/20 hover:outline-neutral-200/40 delay-75 ease-linear transition-all"
             >
               <FileStack size={24} />
+            </div>
+          </div>
+        )}
+      {aiEditorState.selectedTool === 'GenerateQuiz' &&
+        !aiEditorState.isWaitingForResponse &&
+        !aiEditorState.error.isError && (
+          <div className="flex flex-col mx-auto justify-center align-middle items-center">
+            <p className="mx-auto flex p-2 text-white/80 mt-4 font-bold justify-center text-sm align-middle">
+              Select text to generate a quiz from{' '}
+            </p>
+            <div
+              onClick={() => {
+                handleOperation(
+                  aiEditorState.selectedTool,
+                  aiEditorState.chatInputValue
+                )
+              }}
+              className="flex cursor-pointer space-x-1.5 p-4 mt-4 items-center bg-white/10  rounded-md outline outline-1 outline-neutral-200/20 text-2xl font-semibold text-white/70 hover:bg-white/20 hover:outline-neutral-200/40 delay-75 ease-linear transition-all"
+            >
+              <HelpCircle size={24} />
             </div>
           </div>
         )}
