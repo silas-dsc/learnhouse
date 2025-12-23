@@ -119,6 +119,12 @@ source ~/.zshrc
 
 # Create the database if not already created
 createdb learnhouse
+psql
+
+# Run these from the psql prompt:
+# This is only for local dev, not production.
+CREATE ROLE learnhouse LOGIN;
+ALTER USER learnhouse WITH SUPERUSER;
 
 # Navigate to the API directory
 cd ./apps/api
@@ -128,7 +134,7 @@ uv run app.py
 # http://localhost:1338/docs
 
 # To bootstrap the database:
-uv run cli.py install
+# uv run cli.py install
 # Complete the prompts for the database installation
 ```
 
@@ -140,6 +146,9 @@ Open a new terminal tab and navigate to the frontend directory:
 # Navigate to the frontend directory
 cd ./apps/web
 pnpm i
+cp env.example.web .env
+# Edit ./apps/web/.env file, change secret key, etc
+
+
 ```
 
-Copy [doc-root] to the appropriate location.

@@ -32,7 +32,7 @@ mailing_config:
   system_email_address: ""
 
 database_config:
-  sql_connection_string: postgresql://silaspalmer@localhost:5432/silaspalmer
+  sql_connection_string: postgresql://learnhouse:learnhouse@localhost:5432/learnhouse
 
 redis_config:
   redis_connection_string: redis://localhost:6379/learnhouse
