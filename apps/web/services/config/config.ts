@@ -56,9 +56,9 @@ export const getConfig = (key: string, defaultValue: string = ''): string => {
 // Dynamic config getters - these are functions to ensure runtime values are used
 const getLEARNHOUSE_HTTP_PROTOCOL = () =>
   (getConfig('NEXT_PUBLIC_LEARNHOUSE_HTTPS') === 'true') ? 'https://' : 'http://'
-const getLEARNHOUSE_API_URL = () => getConfig('NEXT_PUBLIC_LEARNHOUSE_API_URL', 'http://localhost/api/v1/')
-const getLEARNHOUSE_BACKEND_URL = () => getConfig('NEXT_PUBLIC_LEARNHOUSE_BACKEND_URL', 'http://localhost/')
-const getLEARNHOUSE_DOMAIN = () => getConfig('NEXT_PUBLIC_LEARNHOUSE_DOMAIN', 'localhost')
+const getLEARNHOUSE_API_URL = () => getConfig('NEXT_PUBLIC_LEARNHOUSE_API_URL', 'http://localhost:1338/api/v1/')
+const getLEARNHOUSE_BACKEND_URL = () => getConfig('NEXT_PUBLIC_LEARNHOUSE_BACKEND_URL', 'http://localhost:1338/')
+const getLEARNHOUSE_DOMAIN = () => getConfig('NEXT_PUBLIC_LEARNHOUSE_DOMAIN', 'localhost:3000')
 const getLEARNHOUSE_TOP_DOMAIN = () => getConfig('NEXT_PUBLIC_LEARNHOUSE_TOP_DOMAIN', 'localhost')
 
 // Export getter functions for dynamic runtime configuration

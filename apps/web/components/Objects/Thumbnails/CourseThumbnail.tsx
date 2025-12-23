@@ -180,7 +180,7 @@ const AdminEditOptions = ({ course, orgSlug, deleteCourse }: {
                 <Settings2 className="mr-2 h-4 w-4" /> Settings
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
               <ConfirmationModal
                 confirmationButtonText="Delete Course"
                 confirmationMessage="Are you sure you want to delete this course?"

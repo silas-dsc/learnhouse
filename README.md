@@ -94,3 +94,52 @@ Learn about LearnHouse and how to use it, using LearnHouse
 Learnhouse is made with 💜, from the UI to the features it is carefully designed to make students and teachers lives easier and make education software more enjoyable.
 
 Thank you and have fun using/developing/testing LearnHouse !
+
+
+
+### Mac OS locally hosted guide:
+
+You need all the prerequisites from [here](https://docs.learnhouse.app/setup-dev-environment#init-the-frontend), except for Docker.
+
+```bash
+# Clone the repository
+git clone https://github.com/learnhouse/learnhouse
+cd learnhouse
+
+# Check https://github.com/learnhouse/community-edition/blob/main/docker-compose.yml for versions. 
+# Below is correct at time of writing: 12/2025
+
+# If not already installed
+brew install postgresql@16
+brew install redis
+brew services start postgresql@16
+brew services start redis
+echo 'export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+# Create the database if not already created
+createdb learnhouse
+
+# Navigate to the API directory
+cd ./apps/api
+uv sync
+uv run app.py
+# Confirm you see swagger docs at 
+# http://localhost:1338/docs
+
+# To bootstrap the database:
+uv run cli.py install
+# Complete the prompts for the database installation
+```
+
+### Frontend
+
+Open a new terminal tab and navigate to the frontend directory:
+
+```bash
+# Navigate to the frontend directory
+cd ./apps/web
+pnpm i
+```
+
+Copy [doc-root] to the appropriate location.
