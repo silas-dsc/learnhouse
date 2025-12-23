@@ -17,6 +17,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  images: {
+    qualities: [100, 75],
+  },
 }
 
 module.exports = nextConfig

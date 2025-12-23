@@ -49,7 +49,6 @@ def serialize_activity_text_to_ai_comprehensible_text(
     activity: ActivityRead,
     isActivityEmpty: bool = False,
 ):
-
     if isActivityEmpty:
         text = (
             "Use this as a context "
@@ -64,19 +63,26 @@ def serialize_activity_text_to_ai_comprehensible_text(
 
         return text
 
+    # Validate data_array structure
+    if not data_array or len(data_array) < 3:
+        return (
+            "Error: Invalid activity content structure. "
+            "Ensure the activity content is properly formatted."
+        )
+
     # Serialize Headings
     serialized_headings = ""
-    for heading in data_array[0]["Headings"]:
+    for heading in data_array[0].get("Headings", []):
         serialized_headings += heading + " "
 
     # Serialize Callouts
     serialized_callouts = ""
-    for callout in data_array[1]["Callouts"]:
+    for callout in data_array[1].get("Callouts", []):
         serialized_callouts += callout + " "
 
     # Serialize Paragraphs
     serialized_paragraphs = ""
-    for paragraph in data_array[2]["Paragraphs"]:
+    for paragraph in data_array[2].get("Paragraphs", []):
         serialized_paragraphs += paragraph + " "
 
     # Get a text that is comprehensible by the AI

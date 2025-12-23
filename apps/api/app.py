@@ -31,6 +31,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=learnhouse_config.hosting_config.allowed_origins,
     allow_origin_regex=learnhouse_config.hosting_config.allowed_regexp,
     allow_methods=["*"],
     allow_credentials=True,

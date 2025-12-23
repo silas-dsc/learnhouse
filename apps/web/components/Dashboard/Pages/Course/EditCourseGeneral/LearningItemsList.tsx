@@ -60,7 +60,9 @@ const LearningItemsList = ({ value, onChange, error }: LearningItemsListProps) =
       if (value) {
         const parsedItems = JSON.parse(value);
         if (Array.isArray(parsedItems)) {
-          setItems(parsedItems);
+          if (JSON.stringify(parsedItems) !== JSON.stringify(items)) {
+            setItems(parsedItems);
+          }
           initializedRef.current = true;
         } else if (!initializedRef.current) {
           // Initialize with one empty item if no valid array and not already initialized
@@ -70,7 +72,9 @@ const LearningItemsList = ({ value, onChange, error }: LearningItemsListProps) =
             emoji: '📝',
           };
           setItems([newItem]);
-          onChange(JSON.stringify([newItem]));
+          if (JSON.stringify([newItem]) !== value) {
+            onChange(JSON.stringify([newItem]));
+          }
           initializedRef.current = true;
         }
       } else if (!initializedRef.current) {
@@ -81,7 +85,9 @@ const LearningItemsList = ({ value, onChange, error }: LearningItemsListProps) =
           emoji: '📝',
         };
         setItems([newItem]);
-        onChange(JSON.stringify([newItem]));
+        if (JSON.stringify([newItem]) !== value) {
+          onChange(JSON.stringify([newItem]));
+        }
         initializedRef.current = true;
       }
     } catch (e) {
@@ -94,7 +100,9 @@ const LearningItemsList = ({ value, onChange, error }: LearningItemsListProps) =
           emoji: '📝',
         };
         setItems([newItem]);
-        onChange(JSON.stringify([newItem]));
+        if (JSON.stringify([newItem]) !== value) {
+          onChange(JSON.stringify([newItem]));
+        }
         initializedRef.current = true;
       }
     }
@@ -150,8 +158,10 @@ const LearningItemsList = ({ value, onChange, error }: LearningItemsListProps) =
 
   // Update the parent component with the new JSON string when items change
   const updateItems = (newItems: LearningItem[]) => {
-    setItems(newItems);
-    onChange(JSON.stringify(newItems));
+    if (JSON.stringify(newItems) !== JSON.stringify(items)) {
+      setItems(newItems);
+      onChange(JSON.stringify(newItems));
+    }
   };
 
   // Remove an item
@@ -347,4 +357,4 @@ const LearningItemsList = ({ value, onChange, error }: LearningItemsListProps) =
   );
 };
 
-export default LearningItemsList; 
+export default LearningItemsList;

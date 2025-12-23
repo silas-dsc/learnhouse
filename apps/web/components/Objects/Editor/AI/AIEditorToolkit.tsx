@@ -25,6 +25,7 @@ import {
 } from '@services/ai/ai'
 import useGetAIFeatures from '@components/Hooks/useGetAIFeatures'
 import { useLHSession } from '@components/Contexts/LHSessionContext'
+import { marked } from 'marked';
 
 type AIEditorToolkitProps = {
   editor: Editor
@@ -321,70 +322,157 @@ const UserFeedbackModal = (props: AIEditorToolkitProps) => {
     }
   }
 
-  async function fillEditorWithText(text: string) {
-    const words = text.split(' ')
+  function parseMarkdownToNodes(markdownText: string) {
+    const tokens = marked.lexer(markdownText);
 
-    for (let i = 0; i < words.length; i++) {
-      const textNode = {
-        type: 'text',
-        text: words[i],
+    function parseInlineTokens(tokens) {
+      if (!tokens || tokens.length === 0) {
+        return [{ type: 'text', text: '' }];
       }
 
-      props.editor.chain().focus().insertContent(textNode).run()
-
-      // Add a space after each word except the last one
-      if (i < words.length - 1) {
-        const spaceNode = {
-          type: 'text',
-          text: ' ',
+      const content = [];
+      
+      for (const token of tokens) {
+        if (token.type === 'text') {
+          content.push({ type: 'text', text: token.text });
+        } else if (token.type === 'strong') {
+          content.push({
+            type: 'text',
+            marks: [{ type: 'bold' }],
+            text: token.text,
+          });
+        } else if (token.type === 'em') {
+          content.push({
+            type: 'text',
+            marks: [{ type: 'italic' }],
+            text: token.text,
+          });
+        } else if (token.type === 'codespan') {
+          content.push({
+            type: 'text',
+            marks: [{ type: 'code' }],
+            text: token.text,
+          });
+        } else if (token.type === 'br') {
+          content.push({ type: 'hardBreak' });
+        } else if (token.type === 'link') {
+          content.push({
+            type: 'text',
+            marks: [{ type: 'link', attrs: { href: token.href } }],
+            text: token.text,
+          });
+        } else {
+          // Fallback for unknown inline token types
+          content.push({ type: 'text', text: token.text || token.raw || '' });
         }
-
-        props.editor.chain().focus().insertContent(spaceNode).run()
       }
-
-      // Wait for 0.3 seconds before adding the next word
-      await new Promise((resolve) => setTimeout(resolve, 120))
+      
+      return content.length > 0 ? content : [{ type: 'text', text: '' }];
     }
+
+    const nodes = [];
+
+    for (const token of tokens) {
+      if (token.type === 'heading') {
+        nodes.push({
+          type: 'heading',
+          attrs: { level: token.depth },
+          content: token.tokens ? parseInlineTokens(token.tokens) : [{ type: 'text', text: token.text }],
+        });
+      } else if (token.type === 'paragraph') {
+        nodes.push({
+          type: 'paragraph',
+          content: token.tokens ? parseInlineTokens(token.tokens) : [{ type: 'text', text: token.text }],
+        });
+      } else if (token.type === 'list') {
+        const listNode = {
+          type: token.ordered ? 'orderedList' : 'bulletList',
+          content: token.items.map((item) => {
+            // Extract inline tokens from the first paragraph token in the list item
+            let inlineContent = [{ type: 'text', text: item.text }];
+            
+            if (item.tokens && item.tokens.length > 0) {
+              // Find the first paragraph token and extract its inline tokens
+              const paragraphToken = item.tokens.find(t => t.type === 'paragraph' || t.type === 'text');
+              if (paragraphToken && paragraphToken.tokens) {
+                inlineContent = parseInlineTokens(paragraphToken.tokens);
+              }
+            }
+            
+            return {
+              type: 'listItem',
+              content: [{
+                type: 'paragraph',
+                content: inlineContent,
+              }],
+            };
+          }),
+        };
+        nodes.push(listNode);
+      } else if (token.type === 'blockquote') {
+        nodes.push({
+          type: 'blockquote',
+          content: [{
+            type: 'paragraph',
+            content: token.tokens ? parseInlineTokens(token.tokens) : [{ type: 'text', text: token.text }],
+          }],
+        });
+      } else if (token.type === 'code') {
+        nodes.push({
+          type: 'codeBlock',
+          attrs: { language: token.lang || null },
+          content: [{ type: 'text', text: token.text }],
+        });
+      } else if (token.type === 'table') {
+        const tableNode = {
+          type: 'table',
+          content: token.rows.map((row) => ({
+            type: 'tableRow',
+            content: row.map((cell) => ({
+              type: 'tableCell',
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: cell }],
+              }],
+            })),
+          })),
+        };
+        nodes.push(tableNode);
+      } else if (token.type === 'space') {
+        // Skip space tokens - they're just blank lines between blocks
+        continue;
+      }
+    }
+
+    return nodes;
+  }
+
+  async function fillEditorWithText(markdownText: string) {
+    const nodes = parseMarkdownToNodes(markdownText);
+    // Insert all nodes at once to prevent progressive indentation
+    props.editor.chain().focus().insertContent(nodes).run();
   }
 
   async function replaceSelectedTextWithText(text: string) {
-    const words = text.split(' ')
+    const nodes = parseMarkdownToNodes(text);
 
     // Delete the selected text
-    props.editor.chain().focus().deleteSelection().run()
+    props.editor.chain().focus().deleteSelection().run();
 
-    for (let i = 0; i < words.length; i++) {
-      const textNode = {
-        type: 'text',
-        text: words[i],
-      }
-
-      props.editor.chain().focus().insertContent(textNode).run()
-
-      // Add a space after each word except the last one
-      if (i < words.length - 1) {
-        const spaceNode = {
-          type: 'text',
-          text: ' ',
-        }
-
-        props.editor.chain().focus().insertContent(spaceNode).run()
-      }
-
-      // Wait for 0.3 seconds before adding the next word
-      await new Promise((resolve) => setTimeout(resolve, 120))
-    }
+    // Insert all nodes at once to prevent progressive indentation
+    props.editor.chain().focus().insertContent(nodes).run();
   }
 
   const getPrompt = (args: AIPromptsLabels) => {
     const { label, selection } = args
+    const promptCommon = "Include headings, paragraphs, lists, and callouts where appropriate. Vary the sentence lengths and write in a creative and compelling way, like a professional writer. Use Australian spelling. Strictly adhere to Markdown 1.0 format in your response."
 
     if (label === 'Writer') {
-      return `Write 3 sentences about ${selection}`
+      return `Write about ${selection}. Respond only with what you would write. ${promptCommon}`
     } else if (label === 'ContinueWriting') {
-      return `Continue writing 3 more sentences based on "${selection}"`
+      return `Continue writing 3 more sentences based on "${selection}". Do not repeat the sentences that are already present in the provided text and respond only with the new sentences. ${promptCommon}`
     } else if (label === 'MakeLonger') {
-      return `Make longer this text longer : "${selection}"`
+      return `Make longer this text longer : "${selection}". Add more details and explanations to enhance the content while maintaining the original meaning. Respond only with the enhanced text. ${promptCommon}`
     } else if (label === 'GenerateQuiz') {
       return `Generate a quiz about "${selection}", only return an array of objects, every object should respect the following interface:
             interface Answer {
@@ -401,9 +489,7 @@ const UserFeedbackModal = (props: AIEditorToolkitProps) => {
             " `
     } else if (label === 'Translate') {
       return (
-        `Translate "${selection}" to the ` +
-        aiEditorState.chatInputValue +
-        ` language`
+        `Translate "${selection}" to the ${aiEditorState.chatInputValue} language. Respond only with the translated text.`
       )
     }
   }

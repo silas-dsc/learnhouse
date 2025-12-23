@@ -11,16 +11,22 @@ LH_CONFIG = get_learnhouse_config()
 def get_openai_client() -> OpenAI:
     """Get OpenAI client instance"""
     api_key = getattr(LH_CONFIG.ai_config, 'openai_api_key', None)
+    # Use Ollama instance.
+    # base_url="http://localhost:11434/v1"
+
+    # Use llama-server instance.
+    base_url="http://localhost:8080/v1"
+
     if not api_key:
         raise Exception("OpenAI API key not configured")
-    return OpenAI(api_key=api_key)
+    return OpenAI(api_key=api_key, base_url=base_url)
 
 def ask_ai(
     question: str,
     message_history: Any,
     text_reference: str,
     message_for_the_prompt: str,
-    openai_model_name: str,
+    openai_model_name: str,  # Default to 'gpt-oss:120b-cloud'
 ) -> Dict[str, Any]:
     """
     Process an AI query using OpenAI SDK directly with course content as context
@@ -53,13 +59,25 @@ def ask_ai(
         # Add current question
         messages.append({"role": "user", "content": question})
         
+        # TODO: Remove hardcoded ai model name
+        # Ollama model:
+        # openai_model_name = 'smollm2:135m'
+
+        # Llama-server model:
+        openai_model_name = 'LFM2-350M-Q4_K_M-GGUF'
+
+
         # Make API call to OpenAI
+        
         response = client.chat.completions.create(
             model=openai_model_name,
             messages=messages,
             temperature=0.7,
             max_tokens=1000
         )
+        
+        # Log the complete response for debugging
+        print("AI Response:", response)
         
         return {
             "output": response.choices[0].message.content,

@@ -148,7 +148,29 @@ cd ./apps/web
 pnpm i
 cp env.example.web .env
 # Edit ./apps/web/.env file, change secret key, etc
+pnpm run dev
 
+# visit http://localhost:3000/
+
+# To login:
+# un: admin@school.dev
+# pw: [pw set in LEARNHOUSE_INITIAL_ADMIN_PASSWORD]
 
 ```
 
+Local AI:
+
+```bash
+brew install llama.cpp
+llama-server --hf-repo enacimie/LFM2-350M-Q4_K_M-GGUF --hf-file lfm2-350m-q4_k_m.gguf
+
+# See here for other recommended models: https://huggingface.co/spaces/ngxson/wllama
+# Basic web UI can be accessed via browser: http://localhost:8080
+# Chat completion endpoint: http://localhost:8080/v1/chat/completions
+
+# Edit apps/api/src/services/ai/base.py and change:
+# 18: base_url = "http://localhost:8080/v1"
+# 67: openai_model_name = "LFM2-350M-Q4_K_M-GGUF"
+
+
+```
